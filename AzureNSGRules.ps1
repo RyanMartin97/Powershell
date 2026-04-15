@@ -133,6 +133,25 @@ foreach ($nsg in $allNSGs) {
     foreach ($rule in $ruleSets) {
         $isDefault = $nsg.DefaultSecurityRules.Name -contains $rule.Name
  
+               # Safely resolve a property that may be a plural list, a singular scalar, or absent.
+        # Returns a comma-separated string, or an empty string if nothing is set.
+        function Resolve-RuleField {
+            param($Rule, [string]$PluralProp, [string]$SingularProp)
+            $pluralVal = $null
+            if ($Rule.PSObject.Properties[$PluralProp]) {
+                $pluralVal = $Rule.$PluralProp
+            }
+            if ($pluralVal -and $pluralVal.Count -gt 0) {
+                return ($pluralVal -join ", ")
+            }
+            $singularVal = $null
+            if ($Rule.PSObject.Properties[$SingularProp]) {
+                $singularVal = $Rule.$SingularProp
+            }
+            if ($singularVal) { return $singularVal }
+            return ""
+        }
+ 
         $ruleObj = [PSCustomObject]@{
             # NSG context
             SubscriptionId      = $context.Subscription.Id
@@ -150,22 +169,20 @@ foreach ($nsg in $allNSGs) {
             Access              = $rule.Access          # Allow / Deny
             Protocol            = $rule.Protocol        # TCP / UDP / ICMP / * etc.
             # Source
-            SourceAddressPrefix         = ($rule.SourceAddressPrefixes -join ", ") `
-                                          -replace "^$", $rule.SourceAddressPrefix
-            SourcePortRange             = ($rule.SourcePortRanges -join ", ") `
-                                          -replace "^$", $rule.SourcePortRange
+            SourceAddressPrefix  = Resolve-RuleField $rule "SourceAddressPrefixes"    "SourceAddressPrefix"
+            SourcePortRange      = Resolve-RuleField $rule "SourcePortRanges"         "SourcePortRange"
             # Destination
-            DestinationAddressPrefix    = ($rule.DestinationAddressPrefixes -join ", ") `
-                                          -replace "^$", $rule.DestinationAddressPrefix
-            DestinationPortRange        = ($rule.DestinationPortRanges -join ", ") `
-                                          -replace "^$", $rule.DestinationPortRange
+            DestinationAddressPrefix = Resolve-RuleField $rule "DestinationAddressPrefixes" "DestinationAddressPrefix"
+            DestinationPortRange     = Resolve-RuleField $rule "DestinationPortRanges"      "DestinationPortRange"
             # Application Security Groups
-            SourceASGs          = ($rule.SourceApplicationSecurityGroups `
+            SourceASGs          = (($rule.PSObject.Properties["SourceApplicationSecurityGroups"] `
+                                        ? $rule.SourceApplicationSecurityGroups : @()) `
                                         | ForEach-Object { $_.Id.Split("/")[-1] }) -join "; "
-            DestinationASGs     = ($rule.DestinationApplicationSecurityGroups `
+            DestinationASGs     = (($rule.PSObject.Properties["DestinationApplicationSecurityGroups"] `
+                                        ? $rule.DestinationApplicationSecurityGroups : @()) `
                                         | ForEach-Object { $_.Id.Split("/")[-1] }) -join "; "
-            ProvisioningState   = $rule.ProvisioningState
-            Description         = $rule.Description
+            ProvisioningState   = if ($rule.PSObject.Properties["ProvisioningState"]) { $rule.ProvisioningState } else { "" }
+            Description         = if ($rule.PSObject.Properties["Description"])       { $rule.Description }       else { "" }
         }
  
         $nsgRuleList.Add($ruleObj)
