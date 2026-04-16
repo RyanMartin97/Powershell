@@ -174,11 +174,11 @@ foreach ($nsg in $allNSGs) {
             DestinationAddressPrefix = Resolve-RuleField $rule "DestinationAddressPrefixes" "DestinationAddressPrefix"
             DestinationPortRange     = Resolve-RuleField $rule "DestinationPortRanges"      "DestinationPortRange"
             # Application Security Groups
-            SourceASGs          = (($rule.PSObject.Properties["SourceApplicationSecurityGroups"] `
-                                        ? $rule.SourceApplicationSecurityGroups : @()) `
+                SourceASGs          = ($(if ($rule.PSObject.Properties["SourceApplicationSecurityGroups"]) `
+                                        { $rule.SourceApplicationSecurityGroups } else { @() }) `
                                         | ForEach-Object { $_.Id.Split("/")[-1] }) -join "; "
-            DestinationASGs     = (($rule.PSObject.Properties["DestinationApplicationSecurityGroups"] `
-                                        ? $rule.DestinationApplicationSecurityGroups : @()) `
+            DestinationASGs     = ($(if ($rule.PSObject.Properties["DestinationApplicationSecurityGroups"]) `
+                                        { $rule.DestinationApplicationSecurityGroups } else { @() }) `
                                         | ForEach-Object { $_.Id.Split("/")[-1] }) -join "; "
             ProvisioningState   = if ($rule.PSObject.Properties["ProvisioningState"]) { $rule.ProvisioningState } else { "" }
             Description         = if ($rule.PSObject.Properties["Description"])       { $rule.Description }       else { "" }
