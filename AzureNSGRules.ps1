@@ -77,7 +77,7 @@ if ($SubscriptionId) {
     Set-AzContext -SubscriptionId $SubscriptionId | Out-Null
     $context = Get-AzContext
 } else {
-    $subs = Get-AzSubscription | Where-Object { $_.State -eq "Enabled" }
+    $subs = @(Get-AzSubscription | Where-Object { $_.State -eq "Enabled" })
     if ($subs.Count -eq 0) {
         Write-Error "No enabled subscriptions found for this account."
         exit 1
@@ -100,7 +100,7 @@ Write-Host ("     Using: {0}  ({1})" -f $context.Subscription.Name, $context.Sub
 # ---------------------------------------------------------------------------
 Write-Host "[3/4] Fetching NSGs..." -ForegroundColor Cyan
 
-$allNSGs = Get-AzNetworkSecurityGroup
+$allNSGs = @(Get-AzNetworkSecurityGroup)
 if ($allNSGs.Count -eq 0) {
     Write-Warning "No NSGs found in subscription '$($context.Subscription.Name)'."
     exit 0
@@ -121,16 +121,16 @@ foreach ($nsg in $allNSGs) {
 
     # Choose which rule collections to include
     $ruleSets = @()
-    $ruleSets += $nsg.SecurityRules   # custom rules
+    $ruleSets += @($nsg.SecurityRules)   # custom rules
 
     if ($IncludeDefaultRules) {
-        $ruleSets += $nsg.DefaultSecurityRules
+        $ruleSets += @($nsg.DefaultSecurityRules)
     }
 
     $nsgRuleList = [System.Collections.Generic.List[PSCustomObject]]::new()
 
     foreach ($rule in $ruleSets) {
-        $isDefault = $nsg.DefaultSecurityRules.Name -contains $rule.Name
+        $isDefault = @($nsg.DefaultSecurityRules.Name) -contains $rule.Name
 
         # Safely resolve a property that may be a plural list, a singular scalar, or absent.
         # Returns a comma-separated string, or an empty string if nothing is set.
@@ -173,8 +173,7 @@ foreach ($nsg in $allNSGs) {
             # Destination
             DestinationAddressPrefix = Resolve-RuleField $rule "DestinationAddressPrefixes" "DestinationAddressPrefix"
             DestinationPortRange     = Resolve-RuleField $rule "DestinationPortRanges"      "DestinationPortRange"
-            # Application Security Groups
-                SourceASGs          = ($(if ($rule.PSObject.Properties["SourceApplicationSecurityGroups"]) `
+           SourceASGs          = ($(if ($rule.PSObject.Properties["SourceApplicationSecurityGroups"]) `
                                         { $rule.SourceApplicationSecurityGroups } else { @() }) `
                                         | ForEach-Object { $_.Id.Split("/")[-1] }) -join "; "
             DestinationASGs     = ($(if ($rule.PSObject.Properties["DestinationApplicationSecurityGroups"]) `
@@ -197,8 +196,8 @@ foreach ($nsg in $allNSGs) {
         Rules             = $nsgRuleList
     })
 
-    $customCount  = ($nsgRuleList | Where-Object { -not $_.IsDefaultRule }).Count
-    $defaultCount = ($nsgRuleList | Where-Object { $_.IsDefaultRule }).Count
+    $customCount  = @($nsgRuleList | Where-Object { -not $_.IsDefaultRule }).Count
+    $defaultCount = @($nsgRuleList | Where-Object { $_.IsDefaultRule }).Count
     Write-Host ("     {0,-40}  custom: {1,3}  default: {2,3}" -f $nsg.Name, $customCount, $defaultCount)
 }
 
@@ -217,8 +216,8 @@ Write-Host "JSON saved → $jsonPath" -ForegroundColor Green
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
-$totalCustom  = ($csvRows | Where-Object { -not $_.IsDefaultRule }).Count
-$totalDefault = ($csvRows | Where-Object { $_.IsDefaultRule }).Count
+$totalCustom  = @($csvRows | Where-Object { -not $_.IsDefaultRule }).Count
+$totalDefault = @($csvRows | Where-Object { $_.IsDefaultRule }).Count
 
 Write-Host "`n--- Summary ---" -ForegroundColor Cyan
 Write-Host ("  Subscription : {0}" -f $context.Subscription.Name)
